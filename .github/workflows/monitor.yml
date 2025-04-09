@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: waitlist-monitor
+  group: ticket-tracker
   cancel-in-progress: true
   
 jobs:
