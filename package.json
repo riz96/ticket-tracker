@@ -1,0 +1,9 @@
+{
+  "name": "ticket-tracker",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^24.6.0"
+  }
+}
