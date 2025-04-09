@@ -30,4 +30,4 @@ jobs:
           MODAL_URL: ${{ secrets.MODAL_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: node ticketTracker.js
+        run: node ticket-tracker.js
