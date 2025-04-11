@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 
 // === CONFIG ===
 const MODAL_URL = process.env.MODAL_URL;
-const KEYWORD = 'Join Waitlist';
+const KEYWORD = 'Sold out';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CHECK_INTERVAL_MS = 30000;
