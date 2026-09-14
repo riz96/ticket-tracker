@@ -41,23 +41,23 @@ async function runCheck() {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    let isSoldOut = true;
-    let ticketFound = false;
+    // Puliamo il testo della pagina rimuovendo spazi doppi e a capo
+    const fullText = $('body').text().replace(/\s+/g, ' ');
 
-    $('tr, div').each((_, el) => {
-      const text = $(el).text();
-      if (text.includes(TARGET_TICKET_NAME)) {
-        ticketFound = true;
-        if (!text.toLowerCase().includes("Sold out")) {
-          isSoldOut = false;
-        }
-      }
-    });
+    // Troviamo dove appare il nome del biglietto
+    const ticketPos = fullText.indexOf(TARGET_TICKET_NAME);
 
-    if (!ticketFound) {
-      console.warn(`⚠️ Biglietto "${TARGET_TICKET_NAME}" non rintracciato nella pagina.`);
+    if (ticketPos === -1) {
+      console.warn(`⚠️ Biglietto "${TARGET_TICKET_NAME}" non rintracciato nella pagina!`);
       return;
     }
+
+    // Prendiamo i 200 caratteri successivi al nome del biglietto (dove ci sono prezzo e stato "Sold out")
+    const ticketSnippet = fullText.slice(ticketPos, ticketPos + 200);
+    console.log(`[DEBUG] Testo rilevato per il biglietto: "${ticketSnippet}"`);
+
+    // Verifichiamo se c'è scritto "sold out" in quel blocco
+    const isSoldOut = ticketSnippet.toLowerCase().includes("Sold out");
 
     if (isSoldOut) {
       console.log(`❌ "${TARGET_TICKET_NAME}" è ancora SOLD OUT.`);
