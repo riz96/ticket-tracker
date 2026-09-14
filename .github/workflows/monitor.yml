@@ -2,7 +2,9 @@ name: Ticket Tracker
 
 on:
   schedule:
-    - cron: '*/3 * * * *'  # Runs every 3 minutes
+    # Nota: GitHub Actions non garantisce l'esecuzione precisa al minuto,
+    # e spesso impone un limite minimo di circa 5 minuti per i cron.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,19 +14,19 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 3
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Install deps
-        run: npm install
+      - name: Install dependencies
+        run: npm install cheerio
 
       - name: Run script
         env:
