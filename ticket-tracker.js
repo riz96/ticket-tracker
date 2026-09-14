@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 
-const EVENT_URL = process.env.MODAL_URL || "https://tickets.organizedplay.events/Event/Index/175";
+const EVENT_URL = "https://tickets.organizedplay.events/Event/Index/175";
 const TARGET_TICKET_NAME = "One Piece Regionals Ticket";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -48,7 +48,7 @@ async function runCheck() {
       const text = $(el).text();
       if (text.includes(TARGET_TICKET_NAME)) {
         ticketFound = true;
-        if (!text.toLowerCase().includes("sold out")) {
+        if (!text.toLowerCase().includes("Sold out")) {
           isSoldOut = false;
         }
       }
