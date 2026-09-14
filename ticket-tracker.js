@@ -1,12 +1,10 @@
-import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
-const EVENT_URL = "https://tickets.organizedplay.events/Event/Index/175";
+const EVENT_URL = process.env.MODAL_URL || "https://tickets.organizedplay.events/Event/Index/175";
 const TARGET_TICKET_NAME = "One Piece Regionals Ticket";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const CHECK_INTERVAL_MS = 15000; // 15 secondi (senza browser puoi farlo più frequentemente)
 
 async function sendTelegramAlert(message) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -25,64 +23,54 @@ async function sendTelegramAlert(message) {
   }
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function runCheck() {
+  console.log(`[${new Date().toISOString()}] Controllo disponibilità su: ${EVENT_URL}`);
 
-async function checkTickets() {
-  console.log(`[${new Date().toLocaleTimeString()}] Monitoraggio avviato su: ${EVENT_URL}`);
-
-  while (true) {
-    try {
-      const res = await fetch(EVENT_URL, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Cache-Control': 'no-cache'
-        }
-      });
-
-      if (!res.ok) {
-        console.warn(`[!] HTTP Status ${res.status}. Ritento al prossimo giro...`);
-        await sleep(CHECK_INTERVAL_MS);
-        continue;
+  try {
+    const res = await fetch(EVENT_URL, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cache-Control': 'no-cache'
       }
+    });
 
-      const html = await res.text();
-      const $ = cheerio.load(html);
-
-      // Cerca la sezione contenente il biglietto del torneo
-      const pageText = $('body').text();
-
-      // Trova la riga o il blocco che contiene il nome del biglietto
-      let isSoldOut = true;
-
-      $('tr, div').each((_, el) => {
-        const text = $(el).text();
-        if (text.includes(TARGET_TICKET_NAME)) {
-          // Controlla se in quello specifico elemento o riga compare "Sold out"
-          if (!text.toLowerCase().includes("sold out")) {
-            isSoldOut = false;
-          }
-        }
-      });
-
-      const now = new Date().toLocaleTimeString();
-
-      if (isSoldOut) {
-        console.log(`[${now}] ❌ "${TARGET_TICKET_NAME}" è ancora SOLD OUT.`);
-      } else {
-        console.log(`[${now}] 🚨 BIGLIETTO DISPONIBILE!`);
-        await sendTelegramAlert(
-          `🔥 <b>BIGLIETTO DISPONIBILE!</b>\n\nIl biglietto <i>${TARGET_TICKET_NAME}</i> non risulta più Sold Out!\n\nCorri ad acquistarlo: <a href="${EVENT_URL}">Clicca qui</a>`
-        );
-        break; // Ferma il loop per evitare spam continuo
-      }
-
-    } catch (err) {
-      console.error(`[${new Date().toLocaleTimeString()}] Errore richiesta:`, err.message);
+    if (!res.ok) {
+      throw new Error(`HTTP Error: ${res.status}`);
     }
 
-    await sleep(CHECK_INTERVAL_MS);
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    let isSoldOut = true;
+    let ticketFound = false;
+
+    $('tr, div').each((_, el) => {
+      const text = $(el).text();
+      if (text.includes(TARGET_TICKET_NAME)) {
+        ticketFound = true;
+        if (!text.toLowerCase().includes("sold out")) {
+          isSoldOut = false;
+        }
+      }
+    });
+
+    if (!ticketFound) {
+      console.warn(`⚠️ Biglietto "${TARGET_TICKET_NAME}" non rintracciato nella pagina.`);
+      return;
+    }
+
+    if (isSoldOut) {
+      console.log(`❌ "${TARGET_TICKET_NAME}" è ancora SOLD OUT.`);
+    } else {
+      console.log(`🚨 BIGLIETTO DISPONIBILE!`);
+      await sendTelegramAlert(
+        `🔥 <b>BIGLIETTO DISPONIBILE!</b>\n\nIl biglietto <i>${TARGET_TICKET_NAME}</i> è tornato disponibile!\n\nAcquista subito: <a href="${EVENT_URL}">Clicca qui</a>`
+      );
+    }
+  } catch (err) {
+    console.error('Errore durante l\'esecuzione:', err.message);
   }
 }
 
-checkTickets();
+// Esegui il controllo singolo ed esci
+await runCheck();
