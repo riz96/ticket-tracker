@@ -57,7 +57,7 @@ async function runCheck() {
     console.log(`[DEBUG] Testo rilevato per il biglietto: "${ticketSnippet}"`);
 
     // Verifichiamo se c'è scritto "sold out" in quel blocco
-    const isSoldOut = ticketSnippet.toLowerCase().includes("Sold out");
+    const isSoldOut = ticketSnippet.toLowerCase().includes("sold out");
 
     if (isSoldOut) {
       console.log(`❌ "${TARGET_TICKET_NAME}" è ancora SOLD OUT.`);
