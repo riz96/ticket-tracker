@@ -1,12 +1,31 @@
 import * as cheerio from 'cheerio';
 
-const EVENT_URL = "https://tickets.organizedplay.events/Event/Index/175";
-const TARGET_TICKET_NAME = "One Piece Regionals Ticket";
+// === CONFIGURAZIONE TARGET ===
+// Puoi aggiungere quanti eventi e biglietti vuoi in questo array!
+const TARGETS = [
+  {
+    name: "One Piece Regionals Ticket",
+    url: "https://tickets.organizedplay.events/Event/Index/175"
+  },
+  {
+    name: "One Piece Extra Grand Battle Ticket",
+    url: "https://tickets.organizedplay.events/Event/Index/176"
+  }
+  // Se in futuro hai un altro evento con un altro ID, basta aggiungerlo qui:
+  // {
+  //   name: "Nome Altro Biglietto",
+  //   url: "https://tickets.organizedplay.events/Event/Index/999"
+  // }
+];
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramAlert(message) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn("⚠️ Token o Chat ID non impostati.");
+    return;
+  }
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   try {
     await fetch(url, {
@@ -23,54 +42,68 @@ async function sendTelegramAlert(message) {
   }
 }
 
-async function runCheck() {
-  console.log(`[${new Date().toISOString()}] Controllo disponibilità su: ${EVENT_URL}`);
-
+async function checkSingleTarget(target, cachedPages) {
   try {
-    const res = await fetch(EVENT_URL, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cache-Control': 'no-cache'
-      }
-    });
+    let html = cachedPages[target.url];
 
-    if (!res.ok) {
-      throw new Error(`HTTP Error: ${res.status}`);
+    // Se l'URL non è ancora stato scaricato in questa esecuzione, facciamo la fetch
+    if (!html) {
+      console.log(`[${new Date().toISOString()}] Scaricamento: ${target.url}`);
+      const res = await fetch(target.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cache-Control': 'no-cache'
+        }
+      });
+
+      if (!res.ok) {
+        console.warn(`[!] Errore HTTP ${res.status} per ${target.url}`);
+        return;
+      }
+
+      html = await res.text();
+      cachedPages[target.url] = html; // Salviamo la pagina per non riscaricarla se un altro biglietto è sullo stesso link
     }
 
-    const html = await res.text();
     const $ = cheerio.load(html);
-
-    // Puliamo il testo della pagina rimuovendo spazi doppi e a capo
     const fullText = $('body').text().replace(/\s+/g, ' ');
 
-    // Troviamo dove appare il nome del biglietto
-    const ticketPos = fullText.indexOf(TARGET_TICKET_NAME);
+    const ticketPos = fullText.indexOf(target.name);
 
     if (ticketPos === -1) {
-      console.warn(`⚠️ Biglietto "${TARGET_TICKET_NAME}" non rintracciato nella pagina!`);
+      console.warn(`⚠️ Biglietto "${target.name}" non rintracciato nella pagina.`);
       return;
     }
 
-    // Prendiamo i 200 caratteri successivi al nome del biglietto (dove ci sono prezzo e stato "Sold out")
-    const ticketSnippet = fullText.slice(ticketPos, ticketPos + 200);
-    console.log(`[DEBUG] Testo rilevato per il biglietto: "${ticketSnippet}"`);
+    // Estraiamo la porzione di testo subito successiva al titolo del biglietto
+    const ticketSnippet = fullText.slice(ticketPos, ticketPos + 250);
+    console.log(`[DEBUG] Rilevato per "${target.name}": "${ticketSnippet}"`);
 
-    // Verifichiamo se c'è scritto "sold out" in quel blocco
     const isSoldOut = ticketSnippet.toLowerCase().includes("sold out");
 
     if (isSoldOut) {
-      console.log(`❌ "${TARGET_TICKET_NAME}" è ancora SOLD OUT.`);
+      console.log(`❌ "${target.name}" è ancora SOLD OUT.`);
     } else {
-      console.log(`🚨 BIGLIETTO DISPONIBILE!`);
+      console.log(`🚨 BIGLIETTO DISPONIBILE: "${target.name}"!`);
       await sendTelegramAlert(
-        `🔥 <b>BIGLIETTO DISPONIBILE!</b>\n\nIl biglietto <i>${TARGET_TICKET_NAME}</i> è tornato disponibile!\n\nAcquista subito: <a href="${EVENT_URL}">Clicca qui</a>`
+        `🔥 <b>BIGLIETTO DISPONIBILE!</b>\n\n` +
+        `Ticket: <b>${target.name}</b>\n\n` +
+        `Acquista subito qui: <a href="${target.url}">Clicca per acquistare</a>`
       );
     }
   } catch (err) {
-    console.error('Errore durante l\'esecuzione:', err.message);
+    console.error(`Errore durante il controllo di "${target.name}":`, err.message);
   }
 }
 
-// Esegui il controllo singolo ed esci
+async function runCheck() {
+  // Oggetto cache temporaneo: se più biglietti sono sullo stesso URL (es. evento 175),
+  // la pagina viene scaricata 1 volta sola per evitare sprechi e richieste doppie al server.
+  const cachedPages = {};
+
+  for (const target of TARGETS) {
+    await checkSingleTarget(target, cachedPages);
+  }
+}
+
 await runCheck();
